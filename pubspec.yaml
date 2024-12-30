@@ -1,7 +1,7 @@
 name: auth_token_generator
 description: A Dart package for generating and validating bearer tokens using HMAC-SHA256 encryption.
-version: 1.1.0
-repository: https://github.com/muhsindev/auth_token_generator
+version: 1.1.1
+repository: https://github.com/muhsindev4/auth_token_generator
 
 environment:
   sdk: ^3.6.0
