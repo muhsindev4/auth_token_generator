@@ -29,6 +29,96 @@ class AuthTokenGenerator {
     return '$headerBase64.$payloadBase64.$signatureBase64';
   }
 
+  /// Generates a refresh token with the provided [secretKey], [userId], and optional [expiresIn] duration.
+  ///
+  /// The refresh token is a special type of token used to obtain a new bearer token
+  /// without requiring the user to reauthenticate. The default expiration time is one week (604800 seconds).
+  ///
+  /// - [secretKey]: The secret key used to sign the token.
+  /// - [userId]: The unique identifier for the user.
+  /// - [expiresIn]: The token's expiration time in seconds (default is 7 days).
+  ///
+  /// Returns the generated refresh token string.
+  static String generateRefreshToken(String secretKey, {required String userId, int expiresIn = 604800}) {
+    final claims = {
+      'exp': DateTime.now().add(Duration(seconds: expiresIn)).millisecondsSinceEpoch ~/ 1000,
+      'userId': userId,
+      'type': 'refresh',
+    };
+
+    final header = '{"alg":"HS256","typ":"JWT"}';
+    final payload = jsonEncode(claims);
+    final headerBase64 = base64Url.encode(utf8.encode(header));
+    final payloadBase64 = base64Url.encode(utf8.encode(payload));
+    final signatureBase64 = base64Url.encode(Hmac(sha256, utf8.encode(secretKey))
+        .convert('$headerBase64.$payloadBase64'.codeUnits)
+        .bytes);
+
+    return '$headerBase64.$payloadBase64.$signatureBase64';
+  }
+
+  /// Validates the provided refresh [token] using the specified [secretKey].
+  ///
+  /// A valid refresh token must:
+  /// - Have the correct type (`"refresh"`) in its claims.
+  /// - Pass the signature validation and expiration checks.
+  ///
+  /// - [secretKey]: The secret key used to validate the token's signature.
+  /// - [token]: The refresh token to validate.
+  ///
+  /// Returns `true` if the refresh token is valid, otherwise `false`.
+  static bool validateRefreshToken(String secretKey, String token) {
+    final claims = decodeBearerToken(token);
+    if (claims == null || claims['type'] != 'refresh') {
+      return false; // Not a valid refresh token
+    }
+    return validateBearerToken(secretKey, token);
+  }
+
+  /// Generates a token with custom claims and an expiration time.
+  ///
+  /// This method allows for the inclusion of custom claims in addition to standard claims like `exp` and `userId`.
+  /// It generates a JWT (JSON Web Token) signed using the HMAC-SHA256 algorithm.
+  ///
+  /// - [secretKey]: The secret key used to sign the token.
+  /// - [userId]: The unique identifier for the user.
+  /// - [customClaims]: A map of additional claims to include in the token. Default is an empty map.
+  /// - [expiresIn]: The token's expiration time in seconds. Default is 3600 seconds (1 hour).
+  ///
+  /// Returns the generated token string.
+  ///
+  /// Example usage:
+  /// ```dart
+  /// final token = AuthTokenGenerator.generateTokenWithCustomClaims(
+  ///   'mySecretKey',
+  ///   userId: '12345',
+  ///   customClaims: {'role': 'admin', 'permissions': ['read', 'write']},
+  ///   expiresIn: 7200,
+  /// );
+  /// ```
+  static String generateTokenWithCustomClaims(
+      String secretKey, {
+        required String userId,
+        Map<String, dynamic> customClaims = const {},
+        int expiresIn = 3600,
+      }) {
+    final claims = {
+      'exp': DateTime.now().add(Duration(seconds: expiresIn)).millisecondsSinceEpoch ~/ 1000,
+      'userId': userId,
+      ...customClaims,
+    };
+
+    final header = '{"alg":"HS256","typ":"JWT"}';
+    final payload = jsonEncode(claims);
+    final headerBase64 = base64Url.encode(utf8.encode(header));
+    final payloadBase64 = base64Url.encode(utf8.encode(payload));
+    final signatureBase64 = base64Url.encode(Hmac(sha256, utf8.encode(secretKey))
+        .convert('$headerBase64.$payloadBase64'.codeUnits)
+        .bytes);
+
+    return '$headerBase64.$payloadBase64.$signatureBase64';
+  }
+
   /// Extracts the user ID from the provided bearer [token] using the specified [secretKey].
   /// Returns the extracted user ID if successful, otherwise returns null.
   static String? getUserIdFromBearerToken(String secretKey, String token) {
